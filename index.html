@@ -2,191 +2,292 @@
 <html lang="no">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
-<title>Kollektivskilt</title>
+<title>Bussavganger</title>
 
 <style>
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+
+body{
+    margin:0;
+    background:#000;
+    color:#ffb300;
+    font-family:Arial,Helvetica,sans-serif;
 }
 
-body {
-    background: #000;
-    color: #ff9900;
-    font-family: Arial, Helvetica, sans-serif;
-    overflow: hidden;
+.header{
+    text-align:right;
+    font-size:46px;
+    font-weight:bold;
+    padding:20px;
+    border-bottom:3px solid #ffb300;
 }
 
-.container {
-    width: 100vw;
-    height: 100vh;
-    padding: 30px;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
+.section{
+    padding:25px;
 }
 
-.header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 2px solid #333;
-    padding-bottom: 10px;
+.stopTitle{
+    font-size:42px;
+    font-weight:bold;
+    margin-bottom:25px;
 }
 
-.clock {
-    font-size: 32px;
-    font-weight: bold;
+.destination{
+    font-size:34px;
+    font-weight:bold;
+    margin-top:25px;
+    margin-bottom:8px;
 }
 
-.title {
-    font-size: 36px;
-    font-weight: bold;
+.ticker{
+    overflow:hidden;
+    white-space:nowrap;
+    width:100%;
+    border-bottom:1px solid #222;
+    padding-bottom:10px;
 }
 
-.departure {
-    border-bottom: 1px solid #222;
-    padding-bottom: 15px;
+.ticker-content{
+    display:inline-block;
+    padding-left:100%;
+    animation:scroll 25s linear infinite;
+    font-size:30px;
 }
 
-.top-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+.time{
+    margin-right:50px;
 }
 
-.line-info {
-    display: flex;
-    align-items: center;
-    gap: 15px;
+.delayed{
+    color:#ff4444;
 }
 
-.line-number {
-    background: #ff9900;
-    color: #000;
-    font-weight: bold;
-    font-size: 32px;
-    min-width: 70px;
-    text-align: center;
-    border-radius: 8px;
-    padding: 5px 10px;
+.updated{
+    color:#999;
+    font-size:20px;
+    margin-top:25px;
 }
 
-.destination {
-    font-size: 34px;
-    font-weight: bold;
+.separator{
+    height:3px;
+    background:#333;
+    margin:0 20px;
 }
 
-.next-departure {
-    font-size: 40px;
-    font-weight: bold;
-}
-
-.scroller-wrapper {
-    margin-top: 10px;
-    overflow: hidden;
-    width: 100%;
-}
-
-.scroller {
-    white-space: nowrap;
-    display: inline-block;
-    padding-left: 100%;
-    animation: scroll-left 18s linear infinite;
-    font-size: 24px;
-    color: #ffffff;
-}
-
-@keyframes scroll-left {
-    from {
-        transform: translateX(0%);
+@keyframes scroll{
+    from{
+        transform:translateX(0);
     }
 
-    to {
-        transform: translateX(-100%);
+    to{
+        transform:translateX(-100%);
     }
 }
+
 </style>
 </head>
 <body>
 
-<div class="container">
+<div class="header" id="clock"></div>
 
-    <div class="header">
-        <div class="title">NESTE AVGANGER</div>
-        <div class="clock" id="clock">00:00</div>
-    </div>
-
-    <div class="departure">
-        <div class="top-row">
-            <div class="line-info">
-                <div class="line-number">31</div>
-                <div class="destination">Fornebu</div>
-            </div>
-            <div class="next-departure">2 min</div>
-        </div>
-
-        <div class="scroller-wrapper">
-            <div class="scroller">
-                Neste avganger: 8 min • 14 min • 22 min • 31 min •
-                Neste avganger: 8 min • 14 min • 22 min • 31 min •
-            </div>
-        </div>
-    </div>
-
-    <div class="departure">
-        <div class="top-row">
-            <div class="line-info">
-                <div class="line-number">54</div>
-                <div class="destination">Kjelsås</div>
-            </div>
-            <div class="next-departure">6 min</div>
-        </div>
-
-        <div class="scroller-wrapper">
-            <div class="scroller">
-                Neste avganger: 17 min • 29 min • 42 min • 58 min •
-                Neste avganger: 17 min • 29 min • 42 min • 58 min •
-            </div>
-        </div>
-    </div>
-
-    <div class="departure">
-        <div class="top-row">
-            <div class="line-info">
-                <div class="line-number">5</div>
-                <div class="destination">Vestli</div>
-            </div>
-            <div class="next-departure">4 min</div>
-        </div>
-
-        <div class="scroller-wrapper">
-            <div class="scroller">
-                Neste avganger: 11 min • 18 min • 26 min • 37 min •
-                Neste avganger: 11 min • 18 min • 26 min • 37 min •
-            </div>
-        </div>
-    </div>
-
-</div>
+<div id="content"></div>
 
 <script>
 
-function updateClock() {
-    const now = new Date();
+const STOPS = [
+{
+    name:"BRYN BRANNSTASJON",
+    id:"NSR:StopPlace:6096"
+},
+{
+    name:"BRYNSENGVEIEN",
+    id:"NSR:StopPlace:6094"
+}
+];
 
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
+function updateClock(){
 
-    document.getElementById('clock').innerText =
-        `${hours}:${minutes}`;
+    document.getElementById("clock").textContent =
+        new Date().toLocaleTimeString(
+            "no-NO",
+            {
+                hour:"2-digit",
+                minute:"2-digit"
+            }
+        );
 }
 
+setInterval(updateClock,1000);
 updateClock();
-setInterval(updateClock, 1000);
+
+function clockTime(dateString){
+
+    return new Date(dateString)
+        .toLocaleTimeString(
+            "no-NO",
+            {
+                hour:"2-digit",
+                minute:"2-digit"
+            }
+        );
+}
+
+async function getDepartures(stopId){
+
+    const query = `
+    {
+      stopPlace(id:"${stopId}") {
+
+        estimatedCalls(
+          numberOfDepartures:50
+        ) {
+
+          aimedDepartureTime
+
+          expectedDepartureTime
+
+          destinationDisplay {
+            frontText
+          }
+        }
+      }
+    }
+    `;
+
+    const response = await fetch(
+        "https://api.entur.io/journey-planner/v3/graphql",
+        {
+            method:"POST",
+            headers:{
+                "Content-Type":"application/json",
+                "ET-Client-Name":"bryn-tavle"
+            },
+            body:JSON.stringify({
+                query:query
+            })
+        }
+    );
+
+    const json =
+        await response.json();
+
+    return json.data.stopPlace.estimatedCalls;
+}
+
+async function loadData(){
+
+    const content =
+        document.getElementById("content");
+
+    content.innerHTML="";
+
+    const updated =
+        new Date().toLocaleTimeString(
+            "no-NO",
+            {
+                hour:"2-digit",
+                minute:"2-digit",
+                second:"2-digit"
+            }
+        );
+
+    for(const stop of STOPS){
+
+        const departures =
+            await getDepartures(stop.id);
+
+        const groups = {};
+
+        departures.forEach(dep=>{
+
+            const destination =
+                dep.destinationDisplay.frontText;
+
+            if(!groups[destination]){
+                groups[destination]=[];
+            }
+
+            groups[destination].push(dep);
+
+        });
+
+        let html = `
+        <div class="section">
+
+            <div class="stopTitle">
+                ${stop.name}
+            </div>
+        `;
+
+        Object.keys(groups)
+            .sort()
+            .forEach(destination=>{
+
+                let tickerHTML = "";
+
+                groups[destination]
+                .slice(0,8)
+                .forEach(dep=>{
+
+                    const delayed =
+                        dep.aimedDepartureTime !==
+                        dep.expectedDepartureTime;
+
+                    const css =
+                        delayed
+                        ? "time delayed"
+                        : "time";
+
+                    tickerHTML += `
+                        <span class="${css}">
+                            ${clockTime(
+                                dep.expectedDepartureTime
+                            )}
+                        </span>
+                    `;
+                });
+
+                html += `
+                    <div class="destination">
+                        ${destination}
+                    </div>
+
+                    <div class="ticker">
+
+                        <div class="ticker-content">
+
+                            ${tickerHTML}
+
+                        </div>
+
+                    </div>
+                `;
+            });
+
+        html += `
+            <div class="updated">
+
+                Sist oppdatert:
+                ${updated}
+
+            </div>
+
+        </div>
+
+        <div class="separator"></div>
+        `;
+
+        content.innerHTML += html;
+    }
+}
+
+loadData();
+
+setInterval(
+    loadData,
+    10000
+);
 
 </script>
 

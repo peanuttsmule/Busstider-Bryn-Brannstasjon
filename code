@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bryn Brannstasjon</title>
+
+<style>
+body {
+    margin: 0;
+    background: #000;
+    color: #ffb300;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+.container {
+    padding: 30px;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 3px solid #ffb300;
+    padding-bottom: 10px;
+}
+
+.station {
+    font-size: 3rem;
+    font-weight: bold;
+}
+
+.clock {
+    font-size: 2rem;
+}
+
+.departure {
+    display: grid;
+    grid-template-columns: 120px 1fr 150px;
+    padding: 18px 0;
+    font-size: 2.3rem;
+    border-bottom: 1px solid #333;
+}
+
+.line {
+    font-weight: bold;
+}
+
+.time {
+    text-align: right;
+}
+
+.updated {
+    margin-top: 20px;
+    color: #888;
+    font-size: 1.1rem;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<div class="header">
+    <div class="station">BRYN BRANNSTASJON</div>
+    <div id="clock" class="clock"></div>
+</div>
+
+<div id="departures"></div>
+
+<div class="updated" id="updated"></div>
+
+</div>
+
+<script>
+
+function updateClock() {
+    document.getElementById("clock").textContent =
+        new Date().toLocaleTimeString("no-NO", {
+            hour: "2-digit",
+            minute: "2-digit"
+        });
+}
+
+setInterval(updateClock, 1000);
+updateClock();
+
+async function loadDepartures() {
+
+    // Bytt til riktig holdeplass-ID
+    const stopId = "SETT_INN_ENTUR_STOPPID";
+
+    const query = `
+    {
+      stopPlace(id: "${stopId}") {
+        name
+        estimatedCalls(numberOfDepartures: 6) {
+          destinationDisplay {
+            frontText
+          }
+          serviceJourney {
+            journeyPattern {
+              line {
+                publicCode
+              }
+            }
+          }
+          expectedDepartureTime
+        }
+      }
+    }`;
+
+    try {
+
+        const response = await fetch(
+            "https://api.entur.io/journey-planner/v3/graphql",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "ET-Client-Name": "bryn-skjerm"
+                },
+                body: JSON.stringify({ query })
+            }
+        );
+
+        const json = await response.json();
+
+        const departures =
+            json.data.stopPlace.estimatedCalls;
+
+        const target =
+            document.getElementById("departures");
+
+        target.innerHTML = "";
+
+        departures.forEach(dep => {
+
+            const line =
+              dep.serviceJourney
+              .journeyPattern
+              .line
+              .publicCode;
+
+            const destination =
+              dep.destinationDisplay.frontText;
+
+            const mins =
+              Math.round(
+                (new Date(dep.expectedDepartureTime)
+                 - new Date()) / 60000
+              );
+
+            target.innerHTML += `
+                <div class="departure">
+                    <div class="line">${line}</div>
+                    <div>${destination}</div>
+                    <div class="time">${mins} min</div>
+                </div>
+            `;
+        });
+
+        document.getElementById("updated").textContent =
+            "Oppdatert " +
+            new Date().toLocaleTimeString("no-NO");
+
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+loadDepartures();
+setInterval(loadDepartures, 30000);
+
+</script>
+
+</body>
+</html>

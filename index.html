@@ -40,7 +40,7 @@ body{
 }
 
 .route{
-    margin-bottom:8px;
+    margin-bottom:10px;
 }
 
 .route-header{
@@ -57,7 +57,7 @@ body{
 .next-departure{
     font-size:30px;
     font-weight:bold;
-    min-width:90px;
+    min-width:100px;
     text-align:right;
 }
 
@@ -65,23 +65,14 @@ body{
     color:#ff4444;
 }
 
-.ticker{
-    overflow:hidden;
-    white-space:nowrap;
+.future-times{
     margin-left:25px;
-    height:26px;
+    font-size:22px;
+    color:#ffb300;
 }
 
-.ticker-content{
-    display:inline-block;
-    white-space:nowrap;
-    padding-left:100%;
-    animation:scroll 35s linear infinite;
-    font-size:23px;
-}
-
-.time{
-    margin-right:35px;
+.future-time{
+    margin-right:25px;
 }
 
 .separator{
@@ -96,15 +87,6 @@ body{
     right:15px;
     color:#888;
     font-size:15px;
-}
-
-@keyframes scroll{
-    from{
-        transform:translateX(0);
-    }
-    to{
-        transform:translateX(-100%);
-    }
 }
 
 </style>
@@ -129,8 +111,6 @@ const STOPS = [
     id:"NSR:StopPlace:6094"
 }
 ];
-
-let boardBuilt = false;
 
 function updateClock(){
 
@@ -157,6 +137,17 @@ function formatTime(value){
                 minute:"2-digit"
             }
         );
+}
+
+function minutesUntil(value){
+
+    const diff =
+        Math.round(
+            (new Date(value) - new Date())
+            / 60000
+        );
+
+    return Math.max(diff,0) + " min";
 }
 
 function safeId(text){
@@ -190,7 +181,6 @@ async function fetchStop(stopId){
               }
             }
           }
-
         }
       }
     }
@@ -211,35 +201,6 @@ async function fetchStop(stopId){
     const json = await response.json();
 
     return json.data.stopPlace.estimatedCalls;
-}
-
-function buildRouteHtml(id,key){
-
-    return `
-    <div class="route" id="${id}">
-
-        <div class="route-header">
-
-            <div class="route-name">
-                ${key}
-            </div>
-
-            <div class="next-departure">
-                --
-            </div>
-
-        </div>
-
-        <div class="ticker">
-
-            <div class="ticker-content">
-                Laster...
-            </div>
-
-        </div>
-
-    </div>
-    `;
 }
 
 async function buildBoard(){
@@ -280,7 +241,6 @@ async function buildBoard(){
 
         let html = `
         <div class="section">
-
             <div class="stopTitle">
                 ${stop.name}
             </div>
@@ -291,11 +251,29 @@ async function buildBoard(){
             .forEach(key => {
 
                 const id =
-                    safeId(stop.name+"_"+key);
+                    safeId(stop.name + "_" + key);
 
-                html +=
-                    buildRouteHtml(id,key);
+                html += `
+                <div class="route" id="${id}">
 
+                    <div class="route-header">
+
+                        <div class="route-name">
+                            ${key}
+                        </div>
+
+                        <div class="next-departure">
+                            --
+                        </div>
+
+                    </div>
+
+                    <div class="future-times">
+                        ...
+                    </div>
+
+                </div>
+                `;
             });
 
         html += `
@@ -306,15 +284,9 @@ async function buildBoard(){
 
         content.innerHTML += html;
     }
-
-    boardBuilt = true;
 }
 
 async function updateData(){
-
-    if(!boardBuilt){
-        await buildBoard();
-    }
 
     for(const stop of STOPS){
 
@@ -346,83 +318,77 @@ async function updateData(){
         });
 
         Object.keys(groups)
-            .forEach(key => {
+        .forEach(key => {
 
-                const id =
-                    safeId(stop.name+"_"+key);
+            const id =
+                safeId(stop.name + "_" + key);
 
-                const route =
-                    document.getElementById(id);
+            const route =
+                document.getElementById(id);
 
-                if(!route) return;
+            if(!route) return;
 
-                const deps =
-                    groups[key]
-                    .slice(0,8);
+            const deps =
+                groups[key].slice(0,5);
 
-                if(deps.length===0) return;
+            if(deps.length === 0) return;
 
-                const first =
-                    deps[0];
+            const first =
+                deps[0];
 
-                const next =
-                    route.querySelector(
-                        ".next-departure"
-                    );
-
-                next.textContent =
-                    formatTime(
-                        first.expectedDepartureTime
-                    );
-
-                if(
-                    first.aimedDepartureTime !==
-                    first.expectedDepartureTime
-                ){
-                    next.classList.add(
-                        "delayed"
-                    );
-                }else{
-                    next.classList.remove(
-                        "delayed"
-                    );
-                }
-
-                let ticker = "";
-
-                deps.slice(1)
-                .forEach(dep => {
-
-                    const delayed =
-                        dep.aimedDepartureTime !==
-                        dep.expectedDepartureTime;
-
-                    const cls =
-                        delayed
-                        ? "time delayed"
-                        : "time";
-
-                    ticker += `
-                        <span class="${cls}">
-                            ${formatTime(
-                              dep.expectedDepartureTime
-                            )}
-                        </span>
-                    `;
-                });
-
-                /* Dupliseres for sømløs scrolling */
-                ticker = ticker + ticker;
-
+            const nextElement =
                 route.querySelector(
-                    ".ticker-content"
-                ).innerHTML = ticker;
+                    ".next-departure"
+                );
 
+            nextElement.textContent =
+                minutesUntil(
+                    first.expectedDepartureTime
+                );
+
+            if(
+                first.aimedDepartureTime !==
+                first.expectedDepartureTime
+            ){
+                nextElement.classList.add(
+                    "delayed"
+                );
+            }
+            else{
+                nextElement.classList.remove(
+                    "delayed"
+                );
+            }
+
+            let futureHtml = "";
+
+            deps.slice(1).forEach(dep => {
+
+                const delayed =
+                    dep.aimedDepartureTime !==
+                    dep.expectedDepartureTime;
+
+                futureHtml += `
+                <span class="
+                    future-time
+                    ${delayed ? 'delayed' : ''}
+                ">
+                    ${formatTime(
+                        dep.expectedDepartureTime
+                    )}
+                </span>
+                `;
             });
+
+            route.querySelector(
+                ".future-times"
+            ).innerHTML = futureHtml;
+
+        });
     }
 
     document.getElementById("updated")
-        .textContent =
+    .textContent =
         "Sist oppdatert " +
         new Date().toLocaleTimeString(
             "no-NO",

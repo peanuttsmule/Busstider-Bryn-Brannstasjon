@@ -3,174 +3,228 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bryn Brannstasjon</title>
+
+<title>Bussavganger Bryn</title>
 
 <style>
-body {
-    margin: 0;
-    background: #000;
-    color: #ffb300;
-    font-family: Arial, Helvetica, sans-serif;
+
+body{
+    margin:0;
+    background:#000;
+    color:#ffb300;
+    font-family:Arial, Helvetica, sans-serif;
 }
 
-.container {
-    padding: 30px;
+.header{
+    display:flex;
+    justify-content:flex-end;
+    align-items:center;
+    font-size:48px;
+    font-weight:bold;
+    padding:20px 30px;
+    border-bottom:3px solid #ffb300;
 }
 
-.header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 3px solid #ffb300;
-    padding-bottom: 10px;
+.stopSection{
+    padding:25px 30px;
 }
 
-.station {
-    font-size: 3rem;
-    font-weight: bold;
+.stopTitle{
+    font-size:42px;
+    font-weight:bold;
+    margin-bottom:25px;
+    border-bottom:2px solid #444;
+    padding-bottom:10px;
 }
 
-.clock {
-    font-size: 2rem;
+.departureRow{
+    display:grid;
+    grid-template-columns:350px 1fr;
+    gap:20px;
+    margin-bottom:20px;
+    align-items:center;
 }
 
-.departure {
-    display: grid;
-    grid-template-columns: 120px 1fr 150px;
-    padding: 18px 0;
-    font-size: 2.3rem;
-    border-bottom: 1px solid #333;
+.destination{
+    font-size:36px;
+    font-weight:bold;
 }
 
-.line {
-    font-weight: bold;
+.times{
+    text-align:right;
 }
 
-.time {
-    text-align: right;
+.time{
+    display:inline-block;
+    min-width:80px;
+    font-size:34px;
+    margin-left:10px;
 }
 
-.updated {
-    margin-top: 20px;
-    color: #888;
-    font-size: 1.1rem;
+.separator{
+    height:3px;
+    background:#333;
+    margin:0 30px;
 }
+
 </style>
 </head>
 <body>
 
-<div class="container">
+<div class="header" id="clock"></div>
 
-<div class="header">
-    <div class="station">BRYN BRANNSTASJON</div>
-    <div id="clock" class="clock"></div>
-</div>
-
-<div id="departures"></div>
-
-<div class="updated" id="updated"></div>
-
-</div>
+<div id="content"></div>
 
 <script>
 
+const STOPS = [
+{
+    name: "BRYN BRANNSTASJON",
+    id: "NSR:StopPlace:6096"
+},
+{
+    name: "BRYNSENGVEIEN",
+    id: "NSR:StopPlace:6094"
+}
+];
+
 function updateClock() {
+
     document.getElementById("clock").textContent =
         new Date().toLocaleTimeString("no-NO", {
             hour: "2-digit",
             minute: "2-digit"
         });
+
 }
 
-setInterval(updateClock, 1000);
+setInterval(updateClock,1000);
 updateClock();
 
-async function loadDepartures() {
+function minutesUntil(timeString){
 
-    // Bytt til riktig holdeplass-ID
-    const stopId = "NSR:StopPlace:6096";
+    const departure = new Date(timeString);
+    const now = new Date();
+
+    let minutes =
+        Math.round((departure - now) / 60000);
+
+    if(minutes < 0){
+        minutes = 0;
+    }
+
+    return minutes + "m";
+}
+
+async function fetchStop(stopId){
 
     const query = `
     {
       stopPlace(id: "${stopId}") {
-        name
-        estimatedCalls(numberOfDepartures: 6) {
+        estimatedCalls(numberOfDepartures: 50) {
           destinationDisplay {
             frontText
-          }
-          serviceJourney {
-            journeyPattern {
-              line {
-                publicCode
-              }
-            }
           }
           expectedDepartureTime
         }
       }
-    }`;
+    }
+    `;
 
-    try {
+    const response = await fetch(
+        "https://api.entur.io/journey-planner/v3/graphql",
+        {
+            method:"POST",
+            headers:{
+                "Content-Type":"application/json",
+                "ET-Client-Name":"bryn-tavle"
+            },
+            body:JSON.stringify({
+                query:query
+            })
+        }
+    );
 
-        const response = await fetch(
-            "https://api.entur.io/journey-planner/v3/graphql",
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "ET-Client-Name": "bryn-skjerm"
-                },
-                body: JSON.stringify({ query })
-            }
-        );
+    const json = await response.json();
 
-        const json = await response.json();
+    return json.data.stopPlace.estimatedCalls;
+}
 
-        const departures =
-            json.data.stopPlace.estimatedCalls;
+async function loadDepartures(){
 
-        const target =
-            document.getElementById("departures");
+    const content =
+        document.getElementById("content");
 
-        target.innerHTML = "";
+    content.innerHTML = "";
+
+    for(const stop of STOPS){
+
+        let departures =
+            await fetchStop(stop.id);
+
+        let grouped = {};
 
         departures.forEach(dep => {
 
-            const line =
-              dep.serviceJourney
-              .journeyPattern
-              .line
-              .publicCode;
-
             const destination =
-              dep.destinationDisplay.frontText;
+                dep.destinationDisplay.frontText;
 
-            const mins =
-              Math.round(
-                (new Date(dep.expectedDepartureTime)
-                 - new Date()) / 60000
-              );
+            if(!grouped[destination]){
+                grouped[destination] = [];
+            }
 
-            target.innerHTML += `
-                <div class="departure">
-                    <div class="line">${line}</div>
-                    <div>${destination}</div>
-                    <div class="time">${mins} min</div>
-                </div>
-            `;
+            grouped[destination].push(
+                dep.expectedDepartureTime
+            );
         });
 
-        document.getElementById("updated").textContent =
-            "Oppdatert " +
-            new Date().toLocaleTimeString("no-NO");
+        let html = `
+        <div class="stopSection">
+            <div class="stopTitle">
+                ${stop.name}
+            </div>
+        `;
 
-    } catch (e) {
-        console.error(e);
+        Object.keys(grouped)
+            .sort()
+            .forEach(destination => {
+
+                const nextDepartures =
+                    grouped[destination].slice(0,4);
+
+                html += `
+                <div class="departureRow">
+                    <div class="destination">
+                        ${destination}
+                    </div>
+
+                    <div class="times">
+                `;
+
+                nextDepartures.forEach(time => {
+
+                    html += `
+                    <span class="time">
+                        ${minutesUntil(time)}
+                    </span>
+                    `;
+                });
+
+                html += `
+                    </div>
+                </div>
+                `;
+            });
+
+        html += `</div><div class="separator"></div>`;
+
+        content.innerHTML += html;
     }
 }
 
 loadDepartures();
-setInterval(loadDepartures, 10000);
+
+setInterval(loadDepartures,10000);
 
 </script>
 

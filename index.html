@@ -20,23 +20,27 @@ body{
     text-align:right;
     font-size:42px;
     font-weight:bold;
-    padding:12px 20px;
+    padding:10px 20px;
     border-bottom:2px solid #ffb300;
 }
 
 .section{
-    padding:15px 20px 5px 20px;
+    padding:12px 20px 8px 20px;
 }
 
 .stopTitle{
-    font-size:34px;
+    display:inline-block;
+    background:#ffb300;
+    color:#000;
+    padding:6px 14px;
+    border-radius:4px;
+    font-size:30px;
     font-weight:bold;
     margin-bottom:10px;
-    margin-top:5px;
 }
 
 .route{
-    margin-bottom:10px;
+    margin-bottom:8px;
 }
 
 .route-header{
@@ -46,7 +50,7 @@ body{
 }
 
 .route-name{
-    font-size:28px;
+    font-size:27px;
     font-weight:bold;
 }
 
@@ -57,32 +61,33 @@ body{
     text-align:right;
 }
 
+.delayed{
+    color:#ff4444;
+}
+
 .ticker{
     overflow:hidden;
     white-space:nowrap;
-    margin-left:35px;
-    height:30px;
+    margin-left:25px;
+    height:26px;
 }
 
 .ticker-content{
     display:inline-block;
+    white-space:nowrap;
     padding-left:100%;
-    animation:scroll 20s linear infinite;
-    font-size:24px;
+    animation:scroll 35s linear infinite;
+    font-size:23px;
 }
 
 .time{
     margin-right:35px;
 }
 
-.delayed{
-    color:#ff4444;
-}
-
 .separator{
     height:2px;
     background:#333;
-    margin:8px 0;
+    margin:5px 0;
 }
 
 #updated{
@@ -90,7 +95,7 @@ body{
     bottom:5px;
     right:15px;
     color:#888;
-    font-size:16px;
+    font-size:15px;
 }
 
 @keyframes scroll{
@@ -125,6 +130,8 @@ const STOPS = [
 }
 ];
 
+let boardBuilt = false;
+
 function updateClock(){
 
     document.getElementById("clock").textContent =
@@ -140,8 +147,9 @@ function updateClock(){
 setInterval(updateClock,1000);
 updateClock();
 
-function formatTime(dateString){
-    return new Date(dateString)
+function formatTime(value){
+
+    return new Date(value)
         .toLocaleTimeString(
             "no-NO",
             {
@@ -149,6 +157,14 @@ function formatTime(dateString){
                 minute:"2-digit"
             }
         );
+}
+
+function safeId(text){
+
+    return text
+        .replaceAll(" ","_")
+        .replaceAll("/","_")
+        .replaceAll(".","_");
 }
 
 async function fetchStop(stopId){
@@ -163,13 +179,13 @@ async function fetchStop(stopId){
 
           expectedDepartureTime
 
-          destinationDisplay {
+          destinationDisplay{
             frontText
           }
 
-          serviceJourney {
-            journeyPattern {
-              line {
+          serviceJourney{
+            journeyPattern{
+              line{
                 publicCode
               }
             }
@@ -197,7 +213,36 @@ async function fetchStop(stopId){
     return json.data.stopPlace.estimatedCalls;
 }
 
-async function refreshBoard(){
+function buildRouteHtml(id,key){
+
+    return `
+    <div class="route" id="${id}">
+
+        <div class="route-header">
+
+            <div class="route-name">
+                ${key}
+            </div>
+
+            <div class="next-departure">
+                --
+            </div>
+
+        </div>
+
+        <div class="ticker">
+
+            <div class="ticker-content">
+                Laster...
+            </div>
+
+        </div>
+
+    </div>
+    `;
+}
+
+async function buildBoard(){
 
     const content =
         document.getElementById("content");
@@ -209,7 +254,7 @@ async function refreshBoard(){
         const departures =
             await fetchStop(stop.id);
 
-        let groups = {};
+        const groups = {};
 
         departures.forEach(dep => {
 
@@ -224,7 +269,7 @@ async function refreshBoard(){
                 .frontText;
 
             const key =
-                line + " " + destination;
+                `${line} ${destination}`;
 
             if(!groups[key]){
                 groups[key] = [];
@@ -236,85 +281,21 @@ async function refreshBoard(){
         let html = `
         <div class="section">
 
-        <div class="stopTitle">
-        ${stop.name}
-        </div>
+            <div class="stopTitle">
+                ${stop.name}
+            </div>
         `;
 
         Object.keys(groups)
             .sort()
             .forEach(key => {
 
-                const deps =
-                    groups[key]
-                    .slice(0,8);
+                const id =
+                    safeId(stop.name+"_"+key);
 
-                if(deps.length === 0)
-                    return;
+                html +=
+                    buildRouteHtml(id,key);
 
-                const first =
-                    deps[0];
-
-                const firstDelayed =
-                    first.aimedDepartureTime !==
-                    first.expectedDepartureTime;
-
-                let ticker = "";
-
-                deps.slice(1).forEach(dep => {
-
-                    const delayed =
-                        dep.aimedDepartureTime !==
-                        dep.expectedDepartureTime;
-
-                    ticker += `
-                    <span class="${
-                        delayed
-                        ? 'time delayed'
-                        : 'time'
-                    }">
-                    ${formatTime(
-                       dep.expectedDepartureTime
-                    )}
-                    </span>
-                    `;
-                });
-
-                html += `
-
-                <div class="route">
-
-                    <div class="route-header">
-
-                        <div class="route-name">
-                            ${key}
-                        </div>
-
-                        <div class="${
-                          firstDelayed
-                          ? 'next-departure delayed'
-                          : 'next-departure'
-                        }">
-
-                        ${formatTime(
-                           first.expectedDepartureTime
-                        )}
-
-                        </div>
-
-                    </div>
-
-                    <div class="ticker">
-
-                        <div class="ticker-content">
-                            ${ticker}
-                        </div>
-
-                    </div>
-
-                </div>
-
-                `;
             });
 
         html += `
@@ -324,6 +305,120 @@ async function refreshBoard(){
         `;
 
         content.innerHTML += html;
+    }
+
+    boardBuilt = true;
+}
+
+async function updateData(){
+
+    if(!boardBuilt){
+        await buildBoard();
+    }
+
+    for(const stop of STOPS){
+
+        const departures =
+            await fetchStop(stop.id);
+
+        const groups = {};
+
+        departures.forEach(dep => {
+
+            const line =
+                dep.serviceJourney
+                .journeyPattern
+                .line
+                .publicCode;
+
+            const destination =
+                dep.destinationDisplay
+                .frontText;
+
+            const key =
+                `${line} ${destination}`;
+
+            if(!groups[key]){
+                groups[key] = [];
+            }
+
+            groups[key].push(dep);
+        });
+
+        Object.keys(groups)
+            .forEach(key => {
+
+                const id =
+                    safeId(stop.name+"_"+key);
+
+                const route =
+                    document.getElementById(id);
+
+                if(!route) return;
+
+                const deps =
+                    groups[key]
+                    .slice(0,8);
+
+                if(deps.length===0) return;
+
+                const first =
+                    deps[0];
+
+                const next =
+                    route.querySelector(
+                        ".next-departure"
+                    );
+
+                next.textContent =
+                    formatTime(
+                        first.expectedDepartureTime
+                    );
+
+                if(
+                    first.aimedDepartureTime !==
+                    first.expectedDepartureTime
+                ){
+                    next.classList.add(
+                        "delayed"
+                    );
+                }else{
+                    next.classList.remove(
+                        "delayed"
+                    );
+                }
+
+                let ticker = "";
+
+                deps.slice(1)
+                .forEach(dep => {
+
+                    const delayed =
+                        dep.aimedDepartureTime !==
+                        dep.expectedDepartureTime;
+
+                    const cls =
+                        delayed
+                        ? "time delayed"
+                        : "time";
+
+                    ticker += `
+                        <span class="${cls}">
+                            ${formatTime(
+                              dep.expectedDepartureTime
+                            )}
+                        </span>
+                    `;
+                });
+
+                /* Dupliseres for sømløs scrolling */
+                ticker = ticker + ticker;
+
+                route.querySelector(
+                    ".ticker-content"
+                ).innerHTML = ticker;
+
+            });
     }
 
     document.getElementById("updated")
@@ -339,12 +434,17 @@ async function refreshBoard(){
         );
 }
 
-refreshBoard();
+(async function(){
 
-setInterval(
-    refreshBoard,
-    10000
-);
+    await buildBoard();
+    await updateData();
+
+    setInterval(
+        updateData,
+        10000
+    );
+
+})();
 
 </script>
 

@@ -40,7 +40,13 @@ body{
 }
 
 .route{
-    margin-bottom:10px;
+    padding:4px 0 8px 0;
+    margin-bottom:4px;
+    border-bottom:1px solid #2d2d2d;
+}
+
+.route:last-child{
+    border-bottom:none;
 }
 
 .route-header{
@@ -76,9 +82,9 @@ body{
 }
 
 .separator{
-    height:2px;
-    background:#333;
-    margin:5px 0;
+    height:4px;
+    background:#444;
+    margin:10px 0;
 }
 
 #updated{
@@ -126,6 +132,18 @@ function updateClock(){
 
 setInterval(updateClock,1000);
 updateClock();
+
+function formatTime(value){
+
+    return new Date(value)
+        .toLocaleTimeString(
+            "no-NO",
+            {
+                hour:"2-digit",
+                minute:"2-digit"
+            }
+        );
+}
 
 function minutesUntil(value){
 
@@ -350,20 +368,35 @@ async function updateData(){
 
             let futureHtml = "";
 
-            deps.slice(1).forEach(dep => {
+            deps.slice(1).forEach((dep,index) => {
 
                 const delayed =
                     dep.aimedDepartureTime !==
                     dep.expectedDepartureTime;
+
+                let displayValue;
+
+                if(index === 0){
+
+                    displayValue =
+                        minutesUntil(
+                            dep.expectedDepartureTime
+                        ) + " min";
+
+                }else{
+
+                    displayValue =
+                        formatTime(
+                            dep.expectedDepartureTime
+                        );
+                }
 
                 futureHtml += `
                 <span class="
                     future-time
                     ${delayed ? 'delayed' : ''}
                 ">
-                    ${minutesUntil(
-                        dep.expectedDepartureTime
-                    )} min
+                    ${displayValue}
                 </span>
                 `;
             });
